@@ -1,0 +1,53 @@
+/* Service worker: network-first for same-origin GET requests, cache fallback for offline use. */
+var CACHE = 'calvirtues-v1';
+var ASSETS = [
+  './',
+  'index.html',
+  'css/styles.css',
+  'js/app.js',
+  'js/calendar.js',
+  'js/virtues.js',
+  'js/monk.js',
+  'manifest.webmanifest',
+  'icons/icon.svg',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/apple-touch-icon.png'
+];
+
+self.addEventListener('install', function (event) {
+  event.waitUntil(
+    caches.open(CACHE).then(function (cache) { return cache.addAll(ASSETS); })
+      .then(function () { return self.skipWaiting(); })
+  );
+});
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.filter(function (k) { return k !== CACHE; })
+        .map(function (k) { return caches.delete(k); }));
+    }).then(function () { return self.clients.claim(); })
+  );
+});
+
+self.addEventListener('fetch', function (event) {
+  var req = event.request;
+  if (req.method !== 'GET') { return; }
+  var url = new URL(req.url);
+  if (url.origin !== self.location.origin) { return; }
+
+  event.respondWith(
+    fetch(req).then(function (res) {
+      if (res && res.ok) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (cache) { cache.put(req, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(req).then(function (hit) {
+        return hit || caches.match('index.html');
+      });
+    })
+  );
+});

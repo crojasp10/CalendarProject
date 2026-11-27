@@ -1,0 +1,13 @@
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+*.kubeconfig
+*.pkcs12
+*.pfx
+service-account*.json
+.aws/credentials
+node_modules/
+.DS_Store
+Thumbs.db
