@@ -1,13 +1,30 @@
+# Secrets and credentials
 .env
 .env.*
 *.pem
 *.key
 id_rsa*
+id_ed25519*
 *.kubeconfig
 *.pkcs12
 *.pfx
+*.p12
 service-account*.json
 .aws/credentials
+.npmrc
+.pypirc
+.netrc
+secrets.*
+
+# Dependencies and build output
 node_modules/
+dist/
+build/
+
+# OS and editor files
 .DS_Store
 Thumbs.db
+desktop.ini
+*.log
+.vscode/
+.idea/

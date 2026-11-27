@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Calendar</title>
   <rect width="512" height="512" fill="#4f46e5"/>
-  <rect x="112" y="144" width="288" height="256" rx="32" fill="#ffffff"/>
-  <path d="M112 176a32 32 0 0 1 32-32h224a32 32 0 0 1 32 32v32H112z" fill="#818cf8"/>
-  <g fill="#4f46e5">
-    <circle cx="176" cy="264" r="20"/><circle cx="240" cy="264" r="20"/><circle cx="304" cy="264" r="20"/>
-    <circle cx="176" cy="328" r="20"/><circle cx="240" cy="328" r="20"/><circle cx="304" cy="328" r="20"/>
-  </g>
+  <rect x="130" y="150" width="252" height="232" rx="28" fill="#ffffff"/>
+  <path d="M130 214V178a28 28 0 0 1 28-28H354a28 28 0 0 1 28 28V214Z" fill="#f59e0b"/>
+  <rect x="176" y="124" width="22" height="52" rx="11" fill="#1e1b4b"/>
+  <rect x="314" y="124" width="22" height="52" rx="11" fill="#1e1b4b"/>
+  <polyline points="190,296 234,338 322,252" fill="none" stroke="#4f46e5" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

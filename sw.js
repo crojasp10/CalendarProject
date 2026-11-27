@@ -1,6 +1,11 @@
-/* Service worker: network-first for same-origin GET requests, cache fallback for offline use. */
-var CACHE = 'calvirtues-v1';
-var ASSETS = [
+/* Service worker: network-first with a cache fallback.
+   Bump CACHE_NAME (calvirtues-vN) every time the list of files below changes. */
+'use strict';
+
+var CACHE_NAME = 'calvirtues-v1';
+var PREFIX = 'calvirtues-';
+
+var FILES = [
   './',
   'index.html',
   'css/styles.css',
@@ -17,37 +22,45 @@ var ASSETS = [
 
 self.addEventListener('install', function (event) {
   event.waitUntil(
-    caches.open(CACHE).then(function (cache) { return cache.addAll(ASSETS); })
+    caches.open(CACHE_NAME)
+      .then(function (cache) { return cache.addAll(FILES); })
       .then(function () { return self.skipWaiting(); })
   );
 });
 
 self.addEventListener('activate', function (event) {
   event.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== CACHE; })
-        .map(function (k) { return caches.delete(k); }));
-    }).then(function () { return self.clients.claim(); })
+    caches.keys()
+      .then(function (names) {
+        return Promise.all(names.filter(function (name) {
+          return name.indexOf(PREFIX) === 0 && name !== CACHE_NAME;
+        }).map(function (name) { return caches.delete(name); }));
+      })
+      .then(function () { return self.clients.claim(); })
   );
 });
 
 self.addEventListener('fetch', function (event) {
-  var req = event.request;
-  if (req.method !== 'GET') { return; }
-  var url = new URL(req.url);
+  var request = event.request;
+  if (request.method !== 'GET') { return; }
+  var url = new URL(request.url);
   if (url.origin !== self.location.origin) { return; }
 
   event.respondWith(
-    fetch(req).then(function (res) {
-      if (res && res.ok) {
-        var copy = res.clone();
-        caches.open(CACHE).then(function (cache) { cache.put(req, copy); });
-      }
-      return res;
-    }).catch(function () {
-      return caches.match(req).then(function (hit) {
-        return hit || caches.match('index.html');
-      });
-    })
+    fetch(request)
+      .then(function (response) {
+        if (response && response.ok) {
+          var copy = response.clone();
+          caches.open(CACHE_NAME).then(function (cache) { cache.put(request, copy); });
+        }
+        return response;
+      })
+      .catch(function () {
+        return caches.match(request).then(function (cached) {
+          if (cached) { return cached; }
+          if (request.mode === 'navigate') { return caches.match('index.html'); }
+          return Response.error();
+        });
+      })
   );
 });

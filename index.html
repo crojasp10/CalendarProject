@@ -3,10 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
-  <meta name="theme-color" content="#4f46e5">
-  <meta name="description" content="Interactive calendar, Benjamin Franklin's 13 virtues weekly tracker, and lessons from The Monk Who Sold His Ferrari.">
-  <title>Calendar &amp; 13 Virtues</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Calendar, Benjamin Franklin's 13 virtues tracker and 21-day lessons inspired by The Monk Who Sold His Ferrari.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Calendar">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Calendar</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -14,7 +20,14 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>Calendar &amp; 13 Virtues</h1>
+    <h1>Calendar</h1>
+    <figure class="verse">
+      <blockquote>
+        <p>I can do all things through Christ who strengthens me.</p>
+      </blockquote>
+      <figcaption>Philippians 4:13</figcaption>
+    </figure>
+    <p id="app-alert" class="alert" role="alert" hidden></p>
   </header>
 
   <main>
@@ -27,13 +40,13 @@
       </div>
       <div class="toolbar-sub">
         <button type="button" id="cal-today" class="btn">Today</button>
-        <span id="cal-summary" class="muted"></span>
+        <span id="cal-summary" class="muted" aria-live="polite"></span>
       </div>
       <div id="cal-grid" class="cal-grid"></div>
-      <p class="hint">Tap a day to mark or unmark it. A small dot under the number means that day has virtue dots.</p>
+      <p class="hint">Tap a day to mark or unmark it. A small dot under the number means that day has virtue points.</p>
     </section>
 
-    <!-- Tab 2: Franklin's 13 virtues -->
+    <!-- Tab 2: 13 Virtues (Benjamin Franklin) -->
     <section id="panel-virtues" class="panel" role="tabpanel" aria-labelledby="tab-virtues" hidden>
       <div class="toolbar">
         <button type="button" id="vir-prev" class="icon-btn" aria-label="Previous week">&#8249;</button>
@@ -50,12 +63,12 @@
       <div class="table-wrap">
         <table id="vir-table" class="vir-table"></table>
       </div>
-      <p class="hint">Tap a cell to add or remove a dot. In Franklin's method a dot records a lapse in that virtue on that day. The goal is to keep the focus virtue clean this week.</p>
+      <p class="hint">Tap a cell to add a point (0 to 5). After 5 it goes back to 0.</p>
 
       <details class="card">
         <summary>Cycle settings</summary>
         <div class="card-body">
-          <label for="vir-start">Cycle start date (weeks begin on Monday)</label>
+          <label for="vir-start">Cycle start date (adjusted to Monday)</label>
           <input type="date" id="vir-start" min="1900-01-01" max="2200-12-31">
           <p class="hint">Week 1 of the 13-week cycle starts on this week. The focus virtue changes every week and repeats after week 13.</p>
         </div>
@@ -67,18 +80,43 @@
       </details>
     </section>
 
-    <!-- Tab 3: The Monk Who Sold His Ferrari -->
+    <!-- Tab 3: The Monk (The Monk Who Sold His Ferrari) -->
     <section id="panel-monk" class="panel" role="tabpanel" aria-labelledby="tab-monk" hidden>
-      <h2 class="section-title">The Monk Who Sold His Ferrari</h2>
-      <p class="muted">Seven lessons from Robin Sharma's fable, summarized in my own words with practical techniques. Read the book for the full story.</p>
-      <div id="monk-list" class="monk-list"></div>
+      <div class="toolbar">
+        <button type="button" id="monk-prev" class="icon-btn" aria-label="Previous cycle">&#8249;</button>
+        <h2 id="monk-title" aria-live="polite"></h2>
+        <button type="button" id="monk-next" class="icon-btn" aria-label="Next cycle">&#8250;</button>
+      </div>
+      <div class="toolbar-sub">
+        <button type="button" id="monk-current" class="btn">Current cycle</button>
+        <span id="monk-progress" class="muted" aria-live="polite"></span>
+      </div>
+
+      <div id="monk-focus" class="focus-card"></div>
+
+      <div id="monk-grid" class="monk-grid"></div>
+      <p class="hint">Tap a day to mark it as done. One mark per day covers the whole exercise.</p>
+
+      <details class="card">
+        <summary>Cycle settings</summary>
+        <div class="card-body">
+          <label for="monk-start">Start date of the first cycle</label>
+          <input type="date" id="monk-start" min="1900-01-01" max="2200-12-31">
+          <p class="hint">Each cycle lasts 21 days and has one lesson. After lesson 7 the lessons start over from lesson 1.</p>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>All 7 lessons (reference)</summary>
+        <div id="monk-lessons" class="card-body lesson-list"></div>
+      </details>
     </section>
 
     <!-- Backup -->
     <details class="card data-card">
       <summary>Backup your data</summary>
       <div class="card-body">
-        <p class="hint">Your data is stored only in this browser on this device. Export a backup file to keep it safe or move it to another device.</p>
+        <p class="hint">Your data is stored only in this browser on this device. Export a backup file to keep it safe or to move it to another device.</p>
         <div class="btn-row">
           <button type="button" id="data-export" class="btn">Export backup</button>
           <button type="button" id="data-import" class="btn">Import backup</button>
@@ -94,10 +132,10 @@
       <span class="tab-icon" aria-hidden="true">&#128197;</span><span>Calendar</span>
     </button>
     <button type="button" id="tab-virtues" class="tab" role="tab" aria-controls="panel-virtues" aria-selected="false" data-tab="virtues">
-      <span class="tab-icon" aria-hidden="true">&#9679;</span><span>13 Virtues</span>
+      <span class="tab-icon" aria-hidden="true">&#127775;</span><span>13 Virtues</span>
     </button>
     <button type="button" id="tab-monk" class="tab" role="tab" aria-controls="panel-monk" aria-selected="false" data-tab="monk">
-      <span class="tab-icon" aria-hidden="true">&#127794;</span><span>The Monk</span>
+      <span class="tab-icon" aria-hidden="true">&#127950;</span><span>The Monk</span>
     </button>
   </nav>
 

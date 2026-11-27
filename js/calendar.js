@@ -1,115 +1,108 @@
-/* Tab 1: simple interactive month calendar. */
+/* Tab 1: monthly calendar (Monday to Sunday) with markable days. */
 (function () {
   'use strict';
 
   var App = window.App;
-  var h = App.helpers;
-  var WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var H = App.helpers;
 
-  var today = new Date();
-  var view = { year: today.getFullYear(), month: today.getMonth() };
+  var MIN_YEAR = 1900;
+  var MAX_YEAR = 2200;
+  var view = null; // { y, m } of the month on screen; null means the current month
 
-  var gridEl, titleEl, summaryEl;
-
-  function monthLabel() {
-    return new Date(view.year, view.month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  }
-
-  function dayLabel(date, marked) {
-    var text = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    return text + (marked ? ', marked' : ', not marked');
-  }
-
-  function updateSummary() {
-    var prefix = view.year + '-' + h.pad(view.month + 1) + '-';
-    var count = 0;
-    Object.keys(App.state.marks).forEach(function (key) {
-      if (key.indexOf(prefix) === 0) { count++; }
-    });
-    summaryEl.textContent = count + (count === 1 ? ' day marked' : ' days marked') + ' this month';
-  }
-
-  function applyDayState(btn, key, date) {
-    var marked = App.state.marks[key] === true;
-    var hasDots = Boolean(App.state.virtues[key]);
-    btn.classList.toggle('marked', marked);
-    btn.classList.toggle('has-dots', hasDots);
-    btn.setAttribute('aria-pressed', marked ? 'true' : 'false');
-    btn.setAttribute('aria-label', dayLabel(date, marked) + (hasDots ? ', has virtue dots' : ''));
-  }
-
-  function render() {
-    titleEl.textContent = monthLabel();
-    gridEl.textContent = '';
-
-    WEEKDAYS.forEach(function (name) {
-      var head = document.createElement('div');
-      head.className = 'cal-head';
-      head.textContent = name;
-      gridEl.appendChild(head);
-    });
-
-    var first = new Date(view.year, view.month, 1);
-    var blanks = (first.getDay() + 6) % 7; // Monday-first
-    for (var b = 0; b < blanks; b++) {
-      var blank = document.createElement('div');
-      blank.className = 'day-blank';
-      gridEl.appendChild(blank);
+  function currentView() {
+    if (!view) {
+      var t = new Date();
+      view = { y: t.getFullYear(), m: t.getMonth() };
     }
-
-    var daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
-    var todayKey = h.toKey(new Date());
-
-    for (var day = 1; day <= daysInMonth; day++) {
-      (function (dayNum) {
-        var date = new Date(view.year, view.month, dayNum);
-        var key = h.toKey(date);
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'day' + (key === todayKey ? ' today' : '');
-        btn.textContent = String(dayNum);
-        applyDayState(btn, key, date);
-        btn.addEventListener('click', function () {
-          if (App.state.marks[key]) {
-            delete App.state.marks[key];
-          } else {
-            App.state.marks[key] = true;
-          }
-          App.save();
-          applyDayState(btn, key, date);
-          updateSummary();
-        });
-        gridEl.appendChild(btn);
-      })(day);
-    }
-    updateSummary();
+    return view;
   }
 
   function shiftMonth(delta) {
-    var d = new Date(view.year, view.month + delta, 1);
-    view.year = d.getFullYear();
-    view.month = d.getMonth();
+    var v = currentView();
+    var d = new Date(v.y, v.m + delta, 1);
+    if (d.getFullYear() < MIN_YEAR || d.getFullYear() > MAX_YEAR) { return; }
+    view = { y: d.getFullYear(), m: d.getMonth() };
     render();
   }
 
+  function render(focusKey) {
+    var v = currentView();
+    var grid = document.getElementById('cal-grid');
+    var todayKey = H.toKey(new Date());
+    var first = new Date(v.y, v.m, 1);
+    var daysInMonth = new Date(v.y, v.m + 1, 0).getDate();
+    var offset = (first.getDay() + 6) % 7; // Monday = 0
+    var marks = App.state.marks;
+    var virtues = App.state.virtues;
+    var markedCount = 0;
+    var focusBtn = null;
+
+    document.getElementById('cal-title').textContent = H.MONTHS[v.m] + ' ' + v.y;
+    document.getElementById('cal-prev').disabled = (v.y === MIN_YEAR && v.m === 0);
+    document.getElementById('cal-next').disabled = (v.y === MAX_YEAR && v.m === 11);
+
+    H.clear(grid);
+    var frag = document.createDocumentFragment();
+
+    for (var w = 0; w < 7; w++) {
+      var dow = H.mk('div', 'cal-dow', H.DAYS[w].slice(0, 3));
+      dow.setAttribute('aria-hidden', 'true');
+      frag.appendChild(dow);
+    }
+    for (var b = 0; b < offset; b++) {
+      var blank = H.mk('div', 'cal-blank');
+      blank.setAttribute('aria-hidden', 'true');
+      frag.appendChild(blank);
+    }
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var date = new Date(v.y, v.m, day);
+      var key = H.toKey(date);
+      var marked = marks[key] === true;
+      var hasVirtues = Boolean(virtues[key]);
+      if (marked) { markedCount++; }
+
+      var btn = H.mk('button', 'cal-day');
+      btn.type = 'button';
+      btn.setAttribute('data-key', key);
+      btn.setAttribute('aria-pressed', marked ? 'true' : 'false');
+      var label = H.fmtFull(date) + (key === todayKey ? ', today' : '') +
+        (marked ? ', marked' : ', not marked') + (hasVirtues ? ', has virtue points' : '');
+      btn.setAttribute('aria-label', label);
+      if (marked) { btn.classList.add('marked'); }
+      if (key === todayKey) { btn.classList.add('today'); }
+      btn.appendChild(H.mk('span', 'cal-num', String(day)));
+      var dot = H.mk('span', hasVirtues ? 'cal-dot on' : 'cal-dot');
+      dot.setAttribute('aria-hidden', 'true');
+      btn.appendChild(dot);
+      frag.appendChild(btn);
+      if (key === focusKey) { focusBtn = btn; }
+    }
+    grid.appendChild(frag);
+
+    document.getElementById('cal-summary').textContent =
+      markedCount + (markedCount === 1 ? ' day' : ' days') + ' marked this month';
+
+    if (focusBtn) { focusBtn.focus({ preventScroll: true }); }
+  }
+
+  function toggle(key) {
+    if (!H.isValidKey(key)) { return; }
+    if (App.state.marks[key] === true) { delete App.state.marks[key]; }
+    else { App.state.marks[key] = true; }
+    App.save();
+    render(key);
+  }
+
   function init() {
-    gridEl = document.getElementById('cal-grid');
-    titleEl = document.getElementById('cal-title');
-    summaryEl = document.getElementById('cal-summary');
     document.getElementById('cal-prev').addEventListener('click', function () { shiftMonth(-1); });
     document.getElementById('cal-next').addEventListener('click', function () { shiftMonth(1); });
-    document.getElementById('cal-today').addEventListener('click', function () {
-      var now = new Date();
-      view.year = now.getFullYear();
-      view.month = now.getMonth();
-      render();
+    document.getElementById('cal-today').addEventListener('click', function () { view = null; render(); });
+    document.getElementById('cal-grid').addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.cal-day') : null;
+      if (btn) { toggle(btn.getAttribute('data-key')); }
     });
   }
 
-  App.register({
-    render: function () {
-      if (!gridEl) { init(); } // first render happens after DOMContentLoaded
-      render();
-    }
-  });
+  App.register({ init: init, render: function () { render(); } });
 })();

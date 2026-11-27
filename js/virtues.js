@@ -1,231 +1,229 @@
-/* Tab 2: Benjamin Franklin's 13 virtues, weekly dot tracker. */
+/* Tab 2: Benjamin Franklin's 13 virtues, tracked week by week. */
 (function () {
   'use strict';
 
   var App = window.App;
-  var h = App.helpers;
-  var COUNT = App.VIRTUE_COUNT;
-  var DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  var H = App.helpers;
 
-  // Franklin's virtues and precepts (from his Autobiography, public domain).
+  // Franklin's original precepts, from his Autobiography.
   var VIRTUES = [
     { name: 'Temperance', precept: 'Eat not to dullness; drink not to elevation.' },
     { name: 'Silence', precept: 'Speak not but what may benefit others or yourself; avoid trifling conversation.' },
     { name: 'Order', precept: 'Let all your things have their places; let each part of your business have its time.' },
     { name: 'Resolution', precept: 'Resolve to perform what you ought; perform without fail what you resolve.' },
     { name: 'Frugality', precept: 'Make no expense but to do good to others or yourself; i.e., waste nothing.' },
-    { name: 'Industry', precept: 'Lose no time; be always employed in something useful; cut off all unnecessary actions.' },
+    { name: 'Industry', precept: 'Lose no time; be always employ\u2019d in something useful; cut off all unnecessary actions.' },
     { name: 'Sincerity', precept: 'Use no hurtful deceit; think innocently and justly, and, if you speak, speak accordingly.' },
     { name: 'Justice', precept: 'Wrong none by doing injuries, or omitting the benefits that are your duty.' },
     { name: 'Moderation', precept: 'Avoid extremes; forbear resenting injuries so much as you think they deserve.' },
     { name: 'Cleanliness', precept: 'Tolerate no uncleanliness in body, clothes, or habitation.' },
     { name: 'Tranquillity', precept: 'Be not disturbed at trifles, or at accidents common or unavoidable.' },
-    { name: 'Chastity', precept: 'Rarely use venery but for health or offspring; never to dullness, weakness, or the injury of your own or another\'s peace or reputation.' },
+    { name: 'Chastity', precept: 'Rarely use venery but for health or offspring, never to dullness, weakness, or the injury of your own or another\u2019s peace or reputation.' },
     { name: 'Humility', precept: 'Imitate Jesus and Socrates.' }
   ];
 
-  var weekStart = h.mondayOf(new Date());
-  var titleEl, cycleEl, focusEl, tableEl, startEl, listEl;
-  var ready = false;
+  var weekStart = null; // Monday (Date) of the week on screen; null means the current week
 
-  function fmtShort(d) {
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  function viewMonday() {
+    return weekStart || H.mondayOf(new Date());
   }
 
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) { node.className = className; }
-    if (text !== undefined) { node.textContent = text; }
-    return node;
-  }
-
-  function hasDot(key, v) {
-    var list = App.state.virtues[key];
-    return Boolean(list) && list.indexOf(v) !== -1;
-  }
-
-  function toggleDot(key, v) {
-    var list = App.state.virtues[key] || [];
-    var idx = list.indexOf(v);
-    if (idx === -1) {
-      list.push(v);
-      list.sort(function (a, b) { return a - b; });
-      App.state.virtues[key] = list;
-    } else {
-      list.splice(idx, 1);
-      if (list.length) { App.state.virtues[key] = list; } else { delete App.state.virtues[key]; }
-    }
-    App.save();
-  }
-
-  function weekNumbers() {
-    var weeks = Math.floor(h.diffDays(h.fromKey(App.state.cycleStart), weekStart) / 7);
-    return {
-      weeks: weeks,
-      focus: h.mod(weeks, COUNT),
-      weekInCycle: h.mod(weeks, COUNT) + 1,
-      cycle: Math.floor(weeks / COUNT) + 1
-    };
-  }
-
-  function renderHeader(info) {
-    var end = h.addDays(weekStart, 6);
-    titleEl.textContent = fmtShort(weekStart) + ' \u2013 ' + fmtShort(end) + ', ' + end.getFullYear();
-    cycleEl.textContent = info.weeks < 0
-      ? 'Before your cycle start'
-      : 'Cycle ' + info.cycle + ' \u00b7 Week ' + info.weekInCycle + ' of ' + COUNT;
-
-    focusEl.textContent = '';
-    focusEl.appendChild(el('div', 'label', 'Focus virtue this week'));
-    focusEl.appendChild(el('div', 'name', (info.focus + 1) + '. ' + VIRTUES[info.focus].name));
-    focusEl.appendChild(el('div', 'precept', VIRTUES[info.focus].precept));
-  }
-
-  function renderTable(info) {
-    var todayKey = h.toKey(new Date());
-    var dayDates = [];
-    var dayKeys = [];
-    for (var d = 0; d < 7; d++) {
-      var date = h.addDays(weekStart, d);
-      dayDates.push(date);
-      dayKeys.push(h.toKey(date));
-    }
-
-    tableEl.textContent = '';
-
-    // Header
-    var thead = el('thead');
-    var headRow = el('tr');
-    var corner = el('th', 'virtue-name', 'Virtue');
-    corner.scope = 'col';
-    headRow.appendChild(corner);
-    for (var i = 0; i < 7; i++) {
-      var th = el('th', dayKeys[i] === todayKey ? 'today-col' : '');
-      th.scope = 'col';
-      th.appendChild(document.createTextNode(DAY_LETTERS[i]));
-      th.appendChild(el('small', '', String(dayDates[i].getDate())));
-      headRow.appendChild(th);
-    }
-    var totalHead = el('th', 'total', '\u03a3');
-    totalHead.scope = 'col';
-    totalHead.title = 'Total dots';
-    headRow.appendChild(totalHead);
-    thead.appendChild(headRow);
-    tableEl.appendChild(thead);
-
-    // Body
-    var tbody = el('tbody');
-    var dayTotals = [0, 0, 0, 0, 0, 0, 0];
-    var weekTotal = 0;
-
-    VIRTUES.forEach(function (virtue, v) {
-      var tr = el('tr', v === info.focus ? 'focus' : '');
-      var name = el('th', 'virtue-name', (v + 1) + '. ' + virtue.name);
-      name.scope = 'row';
-      tr.appendChild(name);
-
-      var rowTotal = 0;
-      for (var day = 0; day < 7; day++) {
-        var on = hasDot(dayKeys[day], v);
-        if (on) { rowTotal++; dayTotals[day]++; }
-
-        var td = el('td');
-        var btn = el('button', 'dot-btn');
-        btn.type = 'button';
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        btn.setAttribute('aria-label', virtue.name + ', ' +
-          dayDates[day].toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) +
-          (on ? ', dot' : ', no dot'));
-        btn.setAttribute('data-v', String(v));
-        btn.setAttribute('data-d', String(day));
-        td.appendChild(btn);
-        tr.appendChild(td);
-      }
-      weekTotal += rowTotal;
-      tr.appendChild(el('td', 'total', String(rowTotal)));
-      tbody.appendChild(tr);
-    });
-    tableEl.appendChild(tbody);
-
-    // Footer
-    var tfoot = el('tfoot');
-    var footRow = el('tr');
-    var footLabel = el('th', 'virtue-name', 'Total');
-    footLabel.scope = 'row';
-    footRow.appendChild(footLabel);
-    dayTotals.forEach(function (t) { footRow.appendChild(el('td', '', String(t))); });
-    footRow.appendChild(el('td', 'total', String(weekTotal)));
-    tfoot.appendChild(footRow);
-    tableEl.appendChild(tfoot);
-
-    tableEl.setAttribute('data-keys', dayKeys.join(','));
-  }
-
-  function render() {
-    var info = weekNumbers();
-    renderHeader(info);
-    renderTable(info);
-    startEl.value = App.state.cycleStart;
-  }
-
-  function onTableClick(e) {
-    var btn = e.target.closest ? e.target.closest('.dot-btn') : null;
-    if (!btn) { return; }
-    var v = Number(btn.getAttribute('data-v'));
-    var d = Number(btn.getAttribute('data-d'));
-    var keys = tableEl.getAttribute('data-keys').split(',');
-    if (!(v >= 0 && v < COUNT) || !keys[d]) { return; }
-
-    toggleDot(keys[d], v);
-    App.renderAll(); // also refreshes the calendar indicators
-    var again = tableEl.querySelector('.dot-btn[data-v="' + v + '"][data-d="' + d + '"]');
-    if (again) { again.focus(); }
+  function weekIsValid(monday) {
+    return H.isValidKey(H.toKey(monday)) && H.isValidKey(H.toKey(H.addDays(monday, 6)));
   }
 
   function shiftWeek(delta) {
-    weekStart = h.addDays(weekStart, delta * 7);
+    var next = H.addDays(viewMonday(), delta * 7);
+    if (!weekIsValid(next)) { return; }
+    weekStart = next;
+    render();
+  }
+
+  function pointsOf(key, v) {
+    var day = App.state.virtues[key];
+    return day && day[String(v)] ? day[String(v)] : 0;
+  }
+
+  function weekTitle(monday) {
+    var sunday = H.addDays(monday, 6);
+    if (monday.getFullYear() !== sunday.getFullYear()) {
+      return H.fmtShort(monday) + ', ' + monday.getFullYear() + ' \u2013 ' + H.fmtShort(sunday) + ', ' + sunday.getFullYear();
+    }
+    return H.fmtShort(monday) + ' \u2013 ' + H.fmtShort(sunday) + ', ' + sunday.getFullYear();
+  }
+
+  function dotsBlock(points) {
+    var wrap = H.mk('span', 'dots');
+    wrap.setAttribute('aria-hidden', 'true');
+    var idx = 0;
+    [3, 2].forEach(function (count) {
+      var row = H.mk('span', 'dots-row');
+      for (var i = 0; i < count; i++) {
+        row.appendChild(H.mk('span', idx < points ? 'dot on' : 'dot'));
+        idx++;
+      }
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  function renderFocus(focusIdx, weekNum) {
+    var box = document.getElementById('vir-focus');
+    H.clear(box);
+    box.appendChild(H.mk('p', 'focus-kicker', 'Focus virtue \u00b7 week ' + weekNum + ' of 13'));
+    box.appendChild(H.mk('h3', 'focus-title', (focusIdx + 1) + '. ' + VIRTUES[focusIdx].name));
+    box.appendChild(H.mk('p', 'focus-text', VIRTUES[focusIdx].precept));
+  }
+
+  function renderTable(monday, focusIdx, focusCell) {
+    var table = document.getElementById('vir-table');
+    var todayKey = H.toKey(new Date());
+    var days = [];
+    var i, j;
+    for (i = 0; i < 7; i++) { days.push(H.addDays(monday, i)); }
+    var dayTotals = [0, 0, 0, 0, 0, 0, 0];
+    var weekTotal = 0;
+    var focusBtn = null;
+
+    H.clear(table);
+
+    var caption = H.mk('caption', 'sr-only', 'Virtue points for the week of ' + weekTitle(monday));
+    table.appendChild(caption);
+
+    var thead = document.createElement('thead');
+    var hr = document.createElement('tr');
+    var corner = H.mk('th', 'vname', 'Virtue');
+    corner.scope = 'col';
+    hr.appendChild(corner);
+    for (i = 0; i < 7; i++) {
+      var th = H.mk('th', 'vday' + (H.toKey(days[i]) === todayKey ? ' today' : ''));
+      th.scope = 'col';
+      th.setAttribute('aria-label', H.fmtFull(days[i]));
+      th.appendChild(H.mk('span', 'vday-name', H.DAYS[i].slice(0, 3)));
+      th.appendChild(H.mk('span', 'vday-num', String(days[i].getDate())));
+      hr.appendChild(th);
+    }
+    var totalHead = H.mk('th', 'vtotal', 'Total');
+    totalHead.scope = 'col';
+    hr.appendChild(totalHead);
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    for (j = 0; j < App.VIRTUE_COUNT; j++) {
+      var tr = document.createElement('tr');
+      if (j === focusIdx) { tr.className = 'focus-row'; }
+      var rowHead = H.mk('th', 'vname', VIRTUES[j].name);
+      rowHead.scope = 'row';
+      tr.appendChild(rowHead);
+
+      var rowTotal = 0;
+      for (i = 0; i < 7; i++) {
+        var key = H.toKey(days[i]);
+        var pts = pointsOf(key, j);
+        rowTotal += pts;
+        dayTotals[i] += pts;
+        var td = document.createElement('td');
+        var btn = H.mk('button', 'vcell' + (pts ? ' has' : ''));
+        btn.type = 'button';
+        btn.setAttribute('data-key', key);
+        btn.setAttribute('data-v', String(j));
+        btn.setAttribute('aria-label', VIRTUES[j].name + ', ' + H.fmtFull(days[i]) + ': ' + pts + ' of ' +
+          App.MAX_POINTS + ' points. Tap to ' + (pts >= App.MAX_POINTS ? 'reset to 0.' : 'add one.'));
+        btn.appendChild(dotsBlock(pts));
+        td.appendChild(btn);
+        tr.appendChild(td);
+        if (focusCell && focusCell.key === key && focusCell.v === j) { focusBtn = btn; }
+      }
+      weekTotal += rowTotal;
+      var rt = H.mk('td', 'vtotal', String(rowTotal));
+      rt.setAttribute('aria-label', 'Total for ' + VIRTUES[j].name + ': ' + rowTotal);
+      tr.appendChild(rt);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    var tfoot = document.createElement('tfoot');
+    var fr = document.createElement('tr');
+    var fh = H.mk('th', 'vname', 'Total');
+    fh.scope = 'row';
+    fr.appendChild(fh);
+    for (i = 0; i < 7; i++) {
+      var dt = H.mk('td', 'vtotal', String(dayTotals[i]));
+      dt.setAttribute('aria-label', 'Total for ' + H.fmtFull(days[i]) + ': ' + dayTotals[i]);
+      fr.appendChild(dt);
+    }
+    var wt = H.mk('td', 'vtotal grand', String(weekTotal));
+    wt.setAttribute('aria-label', 'Total for the week: ' + weekTotal);
+    fr.appendChild(wt);
+    tfoot.appendChild(fr);
+    table.appendChild(tfoot);
+
+    if (focusBtn) { focusBtn.focus({ preventScroll: true }); }
+  }
+
+  function renderList() {
+    var list = document.getElementById('vir-list');
+    if (list.childElementCount) { return; } // static content, build once
+    VIRTUES.forEach(function (v) {
+      var li = document.createElement('li');
+      li.appendChild(H.mk('strong', null, v.name));
+      li.appendChild(H.mk('span', null, v.precept));
+      list.appendChild(li);
+    });
+  }
+
+  function render(focusCell) {
+    var monday = viewMonday();
+    var cycleStart = H.fromKey(App.state.cycleStart);
+    var weekIdx = Math.floor(H.diffDays(cycleStart, monday) / 7);
+    var focusIdx = H.mod(weekIdx, App.VIRTUE_COUNT);
+    var weekNum = focusIdx + 1;
+
+    document.getElementById('vir-title').textContent = weekTitle(monday);
+    document.getElementById('vir-prev').disabled = !weekIsValid(H.addDays(monday, -7));
+    document.getElementById('vir-next').disabled = !weekIsValid(H.addDays(monday, 7));
+    document.getElementById('vir-cycle').textContent = 'Week ' + weekNum + ' of 13' +
+      (weekIdx >= 0 ? ' \u00b7 Round ' + (Math.floor(weekIdx / App.VIRTUE_COUNT) + 1) : '');
+    document.getElementById('vir-start').value = App.state.cycleStart;
+
+    renderFocus(focusIdx, weekNum);
+    renderTable(monday, focusIdx, focusCell);
+    renderList();
+  }
+
+  function onCellClick(e) {
+    var btn = e.target.closest ? e.target.closest('.vcell') : null;
+    if (!btn) { return; }
+    var key = btn.getAttribute('data-key');
+    var v = Number(btn.getAttribute('data-v'));
+    if (!H.isValidKey(key) || !(v >= 0 && v < App.VIRTUE_COUNT)) { return; }
+
+    var next = (pointsOf(key, v) + 1) % (App.MAX_POINTS + 1); // 0..5, then back to 0
+    var day = App.state.virtues[key] || {};
+    if (next === 0) { delete day[String(v)]; } else { day[String(v)] = next; }
+    if (Object.keys(day).length) { App.state.virtues[key] = day; }
+    else { delete App.state.virtues[key]; } // empty days are removed
+    App.save();
+    render({ key: key, v: v });
+  }
+
+  function onStartChange() {
+    var input = document.getElementById('vir-start');
+    if (H.isValidKey(input.value)) {
+      App.state.cycleStart = H.toKey(H.mondayOf(H.fromKey(input.value)));
+      App.save();
+    }
     render();
   }
 
   function init() {
-    titleEl = document.getElementById('vir-title');
-    cycleEl = document.getElementById('vir-cycle');
-    focusEl = document.getElementById('vir-focus');
-    tableEl = document.getElementById('vir-table');
-    startEl = document.getElementById('vir-start');
-    listEl = document.getElementById('vir-list');
-
     document.getElementById('vir-prev').addEventListener('click', function () { shiftWeek(-1); });
     document.getElementById('vir-next').addEventListener('click', function () { shiftWeek(1); });
-    document.getElementById('vir-today').addEventListener('click', function () {
-      weekStart = h.mondayOf(new Date());
-      render();
-    });
-    tableEl.addEventListener('click', onTableClick);
-
-    startEl.addEventListener('change', function () {
-      if (!h.isValidKey(startEl.value)) {
-        startEl.value = App.state.cycleStart;
-        return;
-      }
-      App.state.cycleStart = h.toKey(h.mondayOf(h.fromKey(startEl.value)));
-      App.save();
-      render();
-    });
-
-    VIRTUES.forEach(function (virtue) {
-      var li = el('li');
-      li.appendChild(el('strong', '', virtue.name));
-      li.appendChild(el('span', 'precept', virtue.precept));
-      listEl.appendChild(li);
-    });
-    ready = true;
+    document.getElementById('vir-today').addEventListener('click', function () { weekStart = null; render(); });
+    document.getElementById('vir-table').addEventListener('click', onCellClick);
+    document.getElementById('vir-start').addEventListener('change', onStartChange);
   }
 
-  App.register({
-    render: function () {
-      if (!ready) { init(); } // first render happens after DOMContentLoaded
-      render();
-    }
-  });
+  App.register({ init: init, render: function () { render(); } });
 })();
